@@ -1,372 +1,119 @@
-GPUDrive
-========
+# NeuroPilot Project
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) This repository, **NeuroPilot**, originally started as a fork of [nvidia-research/gpudrive](https://github.com/nvidia-research/gpudrive). It is now evolving to explore autonomous driving concepts, currently focusing on an **Automatic Emergency Braking (AEB)** proof-of-concept using the **CARLA Simulator** and **YOLOv8** object detection.
+
+Future work may involve integrating Reinforcement Learning (RL) techniques, potentially leveraging aspects of the original GPUDrive framework. See [PROGRESS.md](PROGRESS.md) for a detailed breakdown of planned steps and current status.
+
+## Current Focus: CARLA AEB Proof-of-Concept (PoC)
+
+Located in the `carla_aeb_poc/` directory, this PoC demonstrates a basic AEB system:
+
+1.  **Connects** to a running CARLA Simulator instance.
+2.  **Spawns** an ego vehicle (Tesla Model 3 by default).
+3.  **Attaches** an RGB camera sensor to the vehicle.
+4.  **Captures** camera images.
+5.  **Processes** images using a YOLOv8 model (`yolov8n.pt` by default) to detect relevant objects (people, cars).
+6.  **Estimates** the distance to the closest relevant obstacle in front (using a *very basic* visual estimation method).
+7.  **Calculates** a simple Time-to-Collision (TTC) assuming the obstacle is stationary.
+8.  **Triggers** emergency braking if the TTC falls below a predefined threshold.
+9.  **Visualizes** the camera feed with bounding boxes using OpenCV.
+
+### Key Limitations of Current PoC:
+
+* **Distance Estimation:** Highly inaccurate, based on simple bounding box height assumptions. Requires significant improvement (e.g., using Lidar/Radar sensors in CARLA, stereo vision, or ground truth data for development).
+* **TTC Calculation:** Assumes obstacles are stationary. Needs relative velocity for accurate prediction with moving objects.
+* **Obstacle Filtering:** Basic check for objects within the center of the camera view.
+
+## Prerequisites & Setup
+
+Ensure the following are installed before running the AEB PoC:
+
+1.  **CARLA Simulator:**
+    * Download and install CARLA from the official repository: [CARLA Releases](https://github.com/carla-simulator/carla/releases) or follow the [Build instructions](https://carla.readthedocs.io/en/latest/build_linux/) (Linux) / [Build instructions](https://carla.readthedocs.io/en/latest/build_windows/) (Windows) / [Build instructions](https://carla.readthedocs.io/en/latest/build_macos/) (macOS).
+    * **Crucially, you need to start the CARLA Simulator executable before running the Python script.** On macOS, this is typically done via:
+        ```bash
+        # Navigate to the directory where you extracted CARLA
+        cd /path/to/your/CARLA_folder/
+        ./CarlaUE4.sh
+        ```
+        Wait for the simulation map to load.
+
+2.  **Python 3.x:** (Python 3.11 recommended based on original `nextSteps.txt`). Check with `python3 --version`. If needed, install from [python.org](https://www.python.org/) or using a package manager like [Homebrew](https://brew.sh/) on macOS (`brew install python`).
+
+3.  **Git:** Needed to clone this repository. Install from [git-scm.com](https://git-scm.com/downloads) or using a package manager (`brew install git`).
+
+4.  **Python Libraries:**
+    * It's highly recommended to use a virtual environment:
+        ```bash
+        python3 -m venv venv
+        source venv/bin/activate # On macOS/Linux
+        # venv\Scripts\activate # On Windows
+        ```
+    * Install required libraries using pip:
+        ```bash
+        pip install carla-client ultralytics opencv-python numpy torch torchvision torchaudio
+        ```
+        * `carla-client`: The official Python API for CARLA.
+        * `ultralytics`: Provides YOLOv8 implementation.
+        * `opencv-python`: For image processing and visualization.
+        * `numpy`: For numerical operations.
+        * `torch`, `torchvision`, `torchaudio`: PyTorch libraries. YOLOv8 uses PyTorch. The command installs versions compatible with your system (including potentially MPS for Apple Silicon).
+
+5.  **PyTorch MPS Support (for Apple Silicon Macs):**
+    * The command above should install a compatible PyTorch version. To verify MPS (Metal Performance Shaders) is available and being used:
+        ```python
+        import torch
+
+        if torch.backends.mps.is_available():
+            mps_device = torch.device("mps")
+            x = torch.ones(1, device=mps_device)
+            print("MPS is available. Using MPS device.")
+            # print(x) # Optional: Print tensor on MPS device
+        else:
+            print ("MPS device not found.")
+
+        # Ultralytics usually detects MPS automatically if available.
+        # You can sometimes explicitly pass device='mps' to the YOLO model if needed.
+        ```
+
+## How to Run the AEB PoC
+
+1.  **Start CARLA Simulator** (as described in Prerequisites).
+2.  **Clone this repository:**
+    ```bash
+    git clone [https://github.com/Vishwas46/NeuroPilot.git](https://github.com/Vishwas46/NeuroPilot.git)
+    cd NeuroPilot
+    ```
+3.  **Set up Python environment and install libraries** (as described in Prerequisites, using a virtual environment is recommended).
+4.  **Navigate to the PoC directory:**
+    ```bash
+    cd carla_aeb_poc
+    ```
+5.  **Run the script:**
+    ```bash
+    python aeb_runner.py
+    ```
+    * You can adjust parameters like CARLA host/port, camera resolution, YOLO model path, and TTC threshold via command-line arguments. Use `python aeb_runner.py --help` to see options.
+6.  An OpenCV window titled 'Camera Feed' should appear, showing the simulation view. Detected objects will have boxes drawn, turning red if the crude TTC calculation indicates a potential collision. Console output will provide more details.
+7.  Press **'q'** in the OpenCV window to stop the script gracefully.
+
+## Future Plans
+
+Refer to [PROGRESS.md](PROGRESS.md) for detailed steps regarding:
+* Refining the AEB PoC (improving perception and control).
+* Exploring the original GPUDrive components.
+* Integrating Reinforcement Learning.
+* Improving documentation.
 
-![Python version](https://img.shields.io/badge/Python-3.11-blue) [![Paper](https://img.shields.io/badge/arXiv-2408.01584-b31b1b.svg)](https://arxiv.org/abs/2408.01584)
+## Original GPUDrive
 
-An extremely fast, data-driven driving simulator written in C++.
-
-## Highlights
-
-- ⚡️ Fast simulation for agent development and evaluation at 1 million FPS through the [Madrona engine](https://madrona-engine.github.io/).
-- 🐍 Provides Python bindings and `gymnasium` wrappers in `torch` and `jax`.
-- 🏃‍➡️ Compatible with the [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), featuring over 100K scenarios with human demonstrations.
-- 📜 Readily available PPO implementations via [SB3](https://github.com/DLR-RM/stable-baselines3) and [CleanRL](https://github.com/vwxyzjn/cleanrl) / [Pufferlib](https://puffer.ai/).
-- 👀 Easily configure the simulator and agent views.
-- 🎨 Diverse agent types: Vehicles, cyclists and pedestrians.
-
-<div align="center">
-
-| Simulator state                                                  | Agent observation                                                |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------- |
-| <img src="assets/sim_video_7.gif" width="320px">    | <img src="assets/obs_video_7.gif" width="320px"> |
-| <img src="assets/sim_video_0_10.gif" width="320px"> | <img src="assets/obs_video_0_10.gif" width="320px"> |
-
-</div>
-
-For details, see our [paper](https://arxiv.org/abs/2408.01584) and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
-
-## Installation
-
-To build GPUDrive, ensure you have all the required dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies) including CMake, Python, and the CUDA Toolkit. See the details below.
-
-<details> <summary>Dependencies</summary>
-
-- CMake >= 3.24
-- Python >= 3.11
-- CUDA Toolkit >= 12.2 and <= 12.4 (We do not support CUDA versions 12.5+ at this time. Verify your CUDA version using nvcc --version.)
-- On macOS and Windows, install the required dependencies for XCode and Visual Studio C++ tools, respectively.
-
-</details>
-
-After installing the necessary dependencies, clone the repository (don't forget the --recursive flag!):
-
-```bash
-git clone --recursive https://github.com/Emerge-Lab/gpudrive.git
-cd gpudrive
-```
-
-Then, there are two options for building the simulator:
-
----
-
-<details>
-  <summary>🔧 Option 1. Manual install </summary>
-
-For Linux and macOS, use the following commands:
-
-```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j # cores to build with, e.g. 32
-cd ..
-```
-
-For Windows, open the cloned repository in Visual Studio and build the project using the integrated `cmake` functionality.
-
-Next, set up a Python environment
-
-#### With pyenv (Recommended)
-
-Create a virtual environment:
-
-```bash
-pyenv virtualenv 3.11 gpudrive
-pyenv activate gpudrive
-```
-
-Set it for the current project directory (optional):
-
-```bash
-pyenv local gpudrive
-```
-
-#### With conda
-
-```bash
-conda env create -f ./environment.yml
-conda activate gpudrive
-```
-
-### Install Python package
-
-Finally, install the Python components of the repository using pip:
-
-```bash
-# macOS and Linux.
-pip install -e .
-```
-
-Optional depencies include [pufferlib], [sb3], [vbd], and [tests].
-
-```bash
-# On Windows.
-pip install -e . -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_BUILD_DIR on Windows
-```
-
-</details>
-
----
-
----
-
-<details>
-  <summary> 🐳  Option 2. Docker </summary>
-
-To get started quickly, we provide a Dockerfile in the root directory.
-
-### Prerequisites
-Ensure you have the following installed:
-- [Docker](https://docs.docker.com/get-docker/)
-- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
-
-### Building the Docker mage
-Once installed, you can build the container with:
-
-```bash
-DOCKER_BUILDKIT=1 docker build --build-arg USE_CUDA=true --tag my_image:latest --progress=plain .
-```
-
-### Running the Container
-To run the container with GPU support and shared memory:
-
-```bash
-docker run --gpus all -it --rm --shm-size=20G -v ${PWD}:/workspace my_image:latest /bin/bash
-```
-
-</details>
-
----
-
-Test whether the installation was successful by importing the simulator:
-
-```Python
-import madrona_gpudrive
-```
-
-To avoid compiling on GPU mode everytime, the following environment variable can be set with any custom path. For example, you can store the compiled program in a cache called `gpudrive_cache`:
-
-```bash
-export MADRONA_MWGPU_KERNEL_CACHE=./gpudrive_cache
-```
-
-Please remember that if you make any changes in C++, you need to delete the cache and recompile.
-
----
-
-<details>
-  <summary>Optional: If you want to use the Madrona viewer in C++</summary>
-
-#### Extra dependencies to use Madrona viewer
-
-  To build the simulator with visualization support on Linux (`build/viewer`), you will need to install X11 and OpenGL development libraries. Equivalent dependencies are already installed by Xcode on macOS. For example, on Ubuntu:
-
-```bash
-  sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev libc++1
-```
-
-</details>
-
----
-
-## Integrations
-
-
-| What                                                                                                    | Info                                                                                                                                                                         | Run                                    | Training SPS |
-| ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------ |
-| **IPPO** implementation [SB3](https://github.com/DLR-RM/stable-baselines3/tree/master) | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf), [PufferLib](https://arxiv.org/pdf/2406.12905), [Implementation](https://github.com/Emerge-Lab/gpudrive/blob/main/integrations/ppo/puffer) | `python baselines/ppo/ppo_sb3.py`      | 25 - 50K                       |
-| **IPPO** implementation [PufferLib](https://github.com/PufferAI/PufferLib) 🐡                           | [PPO](https://arxiv.org/pdf/2406.12905)                                                   | `python baselines/ppo/ppo_pufferlib.py`       | 100 - 300K                     |
-
-
-## Getting started
-
-To get started, see these entry points:
-
-- Our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and how to populate the simulator with different types of actors.
-- The [environment docs](https://github.com/Emerge-Lab/gpudrive/tree/main/gpudrive/env) provide detailed info on environment settings and supported features.
-
-<!-- <p align="center">
-  <img src="assets/GPUDrive_docs_flow.png" width="1300" title="Getting started">
-</p> -->
-
-<!-- ## 📈 Tests
-
-To further test the setup, you can run the pytests in the root directory:
-
-```bash
-pytest
-```
-
-To test if the simulator compiled correctly (and python lib did not), try running the headless program from the build directory.
-
-```bash
-cd build
-./headless CPU 1 # Run on CPU, 1 step
-``` -->
-
-## Pre-trained policies
-
-Several pre-trained policies are available via the `PyTorchModelHubMixin` class on 🤗 huggingface_hub.
-
-- **Best Policy (10,000 Scenarios).** The best policy from [Building reliable sim driving agents by scaling self-play](https://arxiv.org/abs/2502.14706) is available here [here](https://huggingface.co/daphne-cornelisse/policy_S10_000_02_27). This policy was trained on 10,000 randomly sampled scenarios from the WOMD training dataset.
-
-- **Alternative Policy (1,000 Scenarios).** A policy trained on 1,000 scenarios can be found [here](https://huggingface.co/daphne-cornelisse/policy_S1000_02_27)
-
----
-
-> Note: These models were trained with the environment configurations defined in `examples/experimental/config/reliable_agents_params.yaml`, changing environment/observation configurations will affect performance.
-
----
-
-### Usage
-
-To load a pre-trained policy, use the following:
-```Python
-from gpudrive.networks.late_fusion import NeuralNet
-
-# Load pre-trained model via huggingface_hub
-agent = NeuralNet.from_pretrained("daphne-cornelisse/policy_S10_000_02_27")
-```
-
-See [tutorial 04](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials/04_use_pretrained_sim_agent.ipynb) for all the details.
-
-## Dataset
-
-### Download the dataset
-
-- Two versions of the dataset are available, a [mini version](https://huggingface.co/datasets/EMERGE-lab/GPUDrive_mini) with a 1000 training files and 300 test/validation files, and a [large dataset](https://huggingface.co/datasets/EMERGE-lab/GPUDrive) with 100k unique scenes.
-- Replace 'GPUDrive_mini' with 'GPUDrive' below if you wish to download the full dataset.
-
-<details>
-  <summary>Download the dataset</summary>
-
-To download the dataset you need the huggingface_hub library
-
-```bash
-pip install huggingface_hub
-```
-
-Then you can download the dataset using python or just `huggingface-cli`.
-
-- **Option 1**: Using Python
-
-```python
->>> from huggingface_hub import snapshot_download
->>> snapshot_download(repo_id="EMERGE-lab/GPUDrive_mini", repo_type="dataset", local_dir="data/processed")
-```
-
-- **Option 2**: Use the huggingface-cli
-
-1. Log in to your Hugging Face account:
-
-```bash
-huggingface-cli login
-```
-
-2. Download the dataset:
-
-```bash
-huggingface-cli download EMERGE-lab/GPUDrive_mini --local-dir data/processed --repo-type "dataset"
-```
-
-- **Option 3**: Manual Download
-
-1. Visit https://huggingface.co/datasets/EMERGE-lab/GPUDrive_mini
-2. Navigate to the Files and versions tab.
-3. Download the desired files/directories.
-
-_NOTE_: If you downloaded the full-sized dataset, it is grouped to subdirectories of 10k files each (according to hugging face constraints). In order for the path to work with GPUDrive, you need to run
-
-```python
-python data_utils/post_processing.py #use --help if you've used a custom download path
-```
-
-</details>
-
-### Re-build the dataset
-
-If you wish to manually generate the dataset, GPUDrive is compatible with the complete [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), which contains well over 100,000 scenarios. To download new files and create scenarios for the simulator, follow the steps below.
-
-<details>
-  <summary>Re-build the dataset in 3 steps</summary>
-
-1. First, head to [https://waymo.com/open/](https://waymo.com/open/) and click on the "download" button a the top. After registering, click on the files from `v1.2.1 March 2024`, the newest version of the dataset at the time of wrting (10/2024). This will lead you a Google Cloud page. From here, you should see a folder structure like this:
-
-```
-waymo_open_dataset_motion_v_1_2_1/
-│
-├── uncompressed/
-│   ├── lidar_and_camera/
-│   ├── scenario/
-│   │   ├── testing_interactive/
-│   │   ├── testing/
-│   │   ├── training_20s/
-│   │   ├── training/
-│   │   ├── validation_interactive/
-│   │   └── validation/
-│   └── tf_example/
-```
-
-2. Now, download files from testing, training and/or validation in the **`scenario`** folder. An easy way to do this is through `gsutil`.  First register using:
-
-```bash
-gcloud auth login
-```
-
-...then run the command below to download the dataset you prefer. For example, to download the validation dataset:
-
-```bash
-gsutil -m cp -r gs://waymo_open_dataset_motion_v_1_2_1/uncompressed/scenario/validation/ data/raw
-```
-
-where `data/raw` is your local storage folder. Note that this can take a while, depending on the size of the dataset you're downloading.
-
-3. The last thing we need to do is convert the raw data to a format that is compatible with the simulator using:
-
-```bash
-python data_utils/process_waymo_files.py '<raw-data-path>' '<storage-path>' '<dataset>'
-```
-
-Note: Due to an open [issue](https://github.com/waymo-research/waymo-open-dataset/issues/868), installation of `waymo-open-dataset-tf-2.12.0` fails for Python 3.11. To use the script, in a separate Python 3.10 environment, run
-
-```bash
-pip install waymo-open-dataset-tf-2-12-0 trimesh[easy] python-fcl
-```
-
-Then for example, if you want to process the validation data, run:
-
-```bash
-python data_utils/process_waymo_files.py 'data/raw/' 'data/processed/' 'validation'
->>>
-Processing Waymo files: 100%|████████████████████████████████████████████████████████████████| 150/150 [00:05<00:00, 28.18it/s]
-INFO:root:Done!
-```
-
-and that's it!
-
-> **🧐 Caveat**: A single Waymo tfrecord file contains approximately 500 traffic scenarios. Processing speed is about 250 scenes/min on a 16 core CPU. Trying to process the entire validation set for example (150 tfrecords) is a LOT of time.
-
-</details>
-
-### Post-processing
-- Running `python data_utils/postprocessing.py` filters out corrupted files and undoes hugging face directory grouping.
-
-## 📜 Citing GPUDrive
-
-If you use GPUDrive in your research, please cite our ICLR 2025 paper
-```bibtex
-@inproceedings{kazemkhani2025gpudrive,
-      title={GPUDrive: Data-driven, multi-agent driving simulation at 1 million FPS},
-      author={Saman Kazemkhani and Aarav Pandya and Daphne Cornelisse and Brennan Shacklett and Eugene Vinitsky},
-      booktitle={Proceedings of the International Conference on Learning Representations (ICLR)},
-      year={2025},
-      url={https://arxiv.org/abs/2408.01584},
-      eprint={2408.01584},
-      archivePrefix={arXiv},
-      primaryClass={cs.AI},
-}
-```
+For information about the original GPUDrive project this repository was forked from, please refer to [nvidia-research/gpudrive](https://github.com/nvidia-research/gpudrive).
 
 ## Contributing
 
-If you encounter a bug, notice a missing feature, or want to contribute, feel free to create an issue or reach out! We'd be excited to have you involved in the project.
+*(Optional: Add contribution guidelines if you plan for others to contribute)*
+
+## License
+
+*(Optional: Specify your chosen license, e.g., MIT License)*
+This project is licensed under the MIT License - see the LICENSE.md file for details (if you add one).
